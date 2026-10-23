@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weight Calculator</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div>
+      <div class="company" id="companyName"></div>
+      <div class="company-sub" id="companySub"></div>
+    </div>
+    <div class="topbar-actions">
+      <span class="per-chip">Per Amount: <strong id="perAmountTop">Rs 0.00 / kg</strong></span>
+      <span class="user-chip" id="userChip"></span>
+      <button class="btn ghost" id="logoutBtn" type="button">Logout</button>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <div class="hero">
+    <div>
+      <h1>Weight &amp; Amount Calculator</h1>
+      <p>Add item weights, enter the net weight and net amount, then calculate the total amount.</p>
+    </div>
+    <!-- Per Amount: top right, always visible -->
+    <div class="per-card">
+      <div class="label">Per Amount</div>
+      <div class="value" id="perAmountValue">Rs 0.00</div>
+      <div class="unit">per kg &nbsp;(Net Amount ÷ Net Weight)</div>
+    </div>
+  </div>
+
+  <div class="msg" id="msg"></div>
+
+  <!-- Customer (optional) -->
+  <section class="card">
+    <div class="field" style="margin-bottom:0">
+      <label for="customerName">Customer Name <span class="opt">(optional)</span></label>
+      <input type="text" id="customerName" maxlength="80" placeholder="Enter customer name" autocomplete="off">
+    </div>
+  </section>
+
+  <!-- 1. Item weights -->
+  <section class="card">
+    <h2><span class="step">1</span> Item Weights (kg)</h2>
+    <div class="add-row">
+      <input type="number" id="weightInput" inputmode="decimal" step="any" min="0" placeholder="Enter item weight in kg">
+      <button class="btn" id="addBtn" type="button">Add</button>
+    </div>
+    <div class="counter">
+      <span id="itemCount">0 / 100 items</span>
+      <span>Press Enter to add quickly</span>
+    </div>
+    <div class="items" id="itemList"></div>
+
+    <div class="actions">
+      <button class="btn green" id="calcWeightBtn" type="button">Calculate Total Weight</button>
+      <button class="btn danger-ghost" id="clearItemsBtn" type="button">Clear All Items</button>
+    </div>
+
+    <div class="result">
+      <span class="rl">Total Weight (kg)</span>
+      <span class="rv" id="totalWeightValue">—</span>
+    </div>
+  </section>
+
+  <!-- 2. Net weight and net amount -->
+  <section class="card">
+    <h2><span class="step">2</span> Net Weight &amp; Net Amount</h2>
+    <div class="field">
+      <label for="netWeight">Net Weight (kg)</label>
+      <input type="number" id="netWeight" inputmode="decimal" step="any" min="0" placeholder="Enter net weight">
+    </div>
+    <div class="field">
+      <label for="netAmount">Net Amount (Rs)</label>
+      <input type="number" id="netAmount" inputmode="decimal" step="any" min="0" placeholder="Enter net amount">
+    </div>
+    <div class="hint">Per Amount is calculated automatically and shown at the top right.</div>
+
+    <div class="result" style="margin-top:16px">
+      <span class="rl">Total Weight ÷ Net Weight</span>
+      <span class="rv" id="quotientValue">—</span>
+    </div>
+    <div class="result split">
+      <span class="rl">Items &amp; Balance Weight</span>
+      <span class="rv" id="splitValue">—</span>
+    </div>
+    <div class="hint" style="margin-top:8px">
+      Number before the point = Items. Number after the point × Net Weight = balance kg.
+      (Calculate Total Weight first and enter Net Weight.)
+    </div>
+  </section>
+
+  <!-- 3. Total amount -->
+  <section class="card">
+    <h2><span class="step">3</span> Total Amount</h2>
+    <div class="actions" style="margin-top:0">
+      <button class="btn green" id="calcAmountBtn" type="button">Calculate Total Amount</button>
+    </div>
+    <div class="result total">
+      <span class="rl">Total Amount (Rs)</span>
+      <span class="rv" id="totalAmountValue">—</span>
+    </div>
+    <div class="hint" style="margin-top:8px">Total Amount = Total Weight × Per Amount</div>
+  </section>
+
+  <div class="footer-actions">
+    <button class="btn" id="pdfBtn" type="button">Download PDF</button>
+    <button class="btn ghost" id="newBillBtn" type="button">New Bill</button>
+  </div>
+
+</main>
+
+<script src="lib/jspdf.umd.min.js"></script>
+<script src="lib/jspdf.plugin.autotable.min.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
