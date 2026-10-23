@@ -6,7 +6,7 @@ Static website (HTML + CSS + JavaScript). No server needed.
 Open `index.html` in a browser.
 
 ## Put it live with GitHub Pages
-1. Create a new GitHub repository and upload all files from this folder (`index.html` must be at the top level).
+1. Create a new GitHub repository and upload all files from this folder (all files are in one folder, no sub-folders).
 2. Repository -> Settings -> Pages.
 3. Source: "Deploy from a branch", Branch: `main`, folder `/ (root)`, then Save.
 4. After a minute your live link is `https://<your-username>.github.io/<repo-name>/`.
