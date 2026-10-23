@@ -74,10 +74,12 @@
   </div>
 </div>
 
+<script src="firebase-config.js"></script>
+<script src="firebase-bundle.js"></script>
 <script src="auth.js"></script>
 <script>
   // Already signed in? Go straight to the calculator.
-  if (Auth.currentUser()) window.location.replace("app.html");
+  Auth.whenReady().then(function (u) { if (u) window.location.replace("app.html"); }).catch(function () {});
 
   const $ = (id) => document.getElementById(id);
   const msg = $("msg");
@@ -102,9 +104,12 @@
   $("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     clearMsg();
+    const btn = e.target.querySelector("button[type=submit]");
+    btn.disabled = true; btn.textContent = "Please wait...";
     const res = await Auth.login($("loginUser").value, $("loginPass").value);
-    if (res.ok) window.location.href = "app.html";
-    else show(res.error, "err");
+    if (res.ok) { window.location.href = "app.html"; return; }
+    btn.disabled = false; btn.textContent = "Login";
+    show(res.error, "err");
   });
 
   $("registerForm").addEventListener("submit", async (e) => {
@@ -119,6 +124,8 @@
     if (pass.length < 6) return show("Password must be at least 6 characters.", "err");
     if (pass !== $("regPass2").value) return show("The two passwords do not match.", "err");
 
+    const rbtn = e.target.querySelector("button[type=submit]");
+    rbtn.disabled = true; rbtn.textContent = "Creating account...";
     const res = await Auth.register({
       company: $("regCompany").value,
       address: $("regAddress").value,
@@ -128,6 +135,7 @@
       password: pass,
     });
 
+    rbtn.disabled = false; rbtn.textContent = "Create Account";
     if (!res.ok) return show(res.error, "err");
 
     $("registerForm").reset();

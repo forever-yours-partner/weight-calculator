@@ -1,12 +1,15 @@
-(function () {
+(async function () {
   "use strict";
 
   const MAX_ITEMS = 1000;
 
-  const user = Auth.requireLogin();
-  if (!user) return;
+  const session = await Auth.requireLogin();
+  if (!session) return;
+  const uid = session.uid;
+  const user = session.profile;
+  Auth.cacheProfile(uid, user);
 
-  const STORE_KEY = "wc_data_" + user.username;
+  const CACHE_KEY = "wc_data_" + uid;
   const $ = (id) => document.getElementById(id);
 
   // ---------- state ----------
@@ -14,19 +17,73 @@
     return { customer: "", items: [], netWeight: "", netAmount: "", totalWeight: null, totalAmount: null };
   }
 
-  function load() {
-    try {
-      const s = JSON.parse(localStorage.getItem(STORE_KEY));
-      if (s && Array.isArray(s.items)) return Object.assign(blank(), s);
-    } catch (e) { /* ignore */ }
-    return blank();
+  function normalize(s) {
+    if (s && Array.isArray(s.items)) {
+      const out = Object.assign(blank(), s);
+      delete out.updatedAt;
+      return out;
+    }
+    return null;
   }
 
-  let state = load();
+  function readCache() {
+    try { return normalize(JSON.parse(localStorage.getItem(CACHE_KEY))); }
+    catch (e) { return null; }
+  }
+
+  // ---------- online sync (Firestore) ----------
+  function setStatus(text, kind) {
+    const el = $("syncStatus");
+    if (!el) return;
+    el.textContent = text;
+    el.className = "sync" + (kind ? " " + kind : "");
+  }
+
+  let state = blank();
+  try {
+    setStatus("Loading your saved data...", "");
+    const remote = normalize(await Auth.loadWork(uid));
+    state = remote || readCache() || blank();
+    setStatus("Saved online", "ok");
+  } catch (e) {
+    state = readCache() || blank();
+    setStatus("Offline: using data saved on this device", "warn");
+  }
+
+  let saveTimer = null;
+  let saving = false;
+  let dirty = false;
+
+  async function pushNow() {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    if (saving) { dirty = true; return; }
+    saving = true;
+    dirty = false;
+    setStatus("Saving...", "");
+    try {
+      await Auth.saveWork(uid, state);
+      setStatus(dirty ? "Saving..." : "Saved online", dirty ? "" : "ok");
+    } catch (e) {
+      dirty = false;
+      setStatus("Not saved online (no connection). Will retry on next change.", "warn");
+    }
+    saving = false;
+    if (dirty) pushNow();
+  }
 
   function save() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+    setStatus("Saving...", "");
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(pushNow, 700);
   }
+
+  // push any pending change when the user leaves or switches app
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden" && saveTimer) pushNow();
+  });
+  window.addEventListener("pagehide", () => { if (saveTimer) pushNow(); });
 
   // ---------- helpers ----------
   const round = (n, d) => {
@@ -78,8 +135,9 @@
   $("companyName").textContent = user.company;
   $("companySub").textContent = [user.address, user.phone].filter(Boolean).join("  |  ");
   $("userChip").textContent = "User: " + user.username;
-  $("logoutBtn").addEventListener("click", () => {
-    Auth.logout();
+  $("logoutBtn").addEventListener("click", async () => {
+    if (saveTimer) await pushNow();
+    await Auth.logout();
     window.location.replace("index.html");
   });
 

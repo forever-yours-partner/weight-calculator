@@ -1,16 +1,17 @@
-# Weight & Amount Calculator
+# Weight & Amount Calculator (Firebase version)
 
-Static website (HTML + CSS + JavaScript). No server needed.
+Static website: HTML + CSS + JavaScript, with Firebase Authentication and Firestore
+so accounts and bills work on every phone / computer.
 
-## Run locally
-Open `index.html` in a browser.
+## One-time Firebase setup
+1. Firebase console -> Build -> Authentication -> Sign-in method -> Email/Password -> Enable.
+2. Firebase console -> Build -> Firestore Database -> Rules tab -> paste the content of
+   `firestore.rules` -> Publish.
+3. Authentication -> Settings -> Authorized domains -> Add domain:
+   `<your-username>.github.io`
 
-## Put it live with GitHub Pages
-1. Create a new GitHub repository and upload all files from this folder (all files are in one folder, no sub-folders).
-2. Repository -> Settings -> Pages.
-3. Source: "Deploy from a branch", Branch: `main`, folder `/ (root)`, then Save.
-4. After a minute your live link is `https://<your-username>.github.io/<repo-name>/`.
+## Put it live (GitHub Pages)
+Upload every file in this folder (no sub-folders) to the repository root.
+Settings -> Pages -> Deploy from a branch -> main -> / (root).
 
-## Notes
-- Accounts and bill data are stored in the browser (localStorage). An account created on one phone/browser will not exist on another.
-- Login is for convenience only; it is not server-grade security, because this is a static site.
+Live link: https://<your-username>.github.io/<repo-name>/
