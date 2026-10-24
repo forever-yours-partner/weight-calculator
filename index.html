@@ -1,21 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-title="title.login">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Login – Weight Calculator</title>
 <link rel="stylesheet" href="style.css">
+<script src="theme.js"></script>
 </head>
 <body>
 
+<div class="corner">
+  <button class="icon-btn" id="langBtn" type="button" data-i18n-title="lang.toggle">தமிழ்</button>
+  <button class="icon-btn" id="themeBtn" type="button" data-i18n-title="theme.toggle">🌙</button>
+</div>
+
 <div class="auth-wrap">
   <div class="auth-card">
-    <h1>Weight &amp; Amount Calculator</h1>
-    <p class="sub">Sign in to your company account</p>
+    <h1 data-i18n="app.name">Weight &amp; Amount Calculator</h1>
+    <p class="sub" data-i18n="login.sub">Sign in to your company account</p>
 
     <div class="tabs">
-      <button class="tab active" id="tabLogin" type="button">Login</button>
-      <button class="tab" id="tabRegister" type="button">Register</button>
+      <button class="tab active" id="tabLogin" type="button" data-i18n="tab.login">Login</button>
+      <button class="tab" id="tabRegister" type="button" data-i18n="tab.register">Register</button>
     </div>
 
     <div class="msg" id="msg"></div>
@@ -23,59 +29,78 @@
     <!-- LOGIN -->
     <form id="loginForm" autocomplete="on">
       <div class="field">
-        <label for="loginUser">Username</label>
+        <label for="loginUser" data-i18n="f.userOrEmail">Username or Email</label>
         <input type="text" id="loginUser" autocomplete="username" required>
       </div>
       <div class="field">
-        <label for="loginPass">Password</label>
+        <label for="loginPass" data-i18n="f.password">Password</label>
         <input type="password" id="loginPass" autocomplete="current-password" required>
       </div>
-      <button class="btn block" type="submit">Login</button>
+      <button class="btn block" type="submit" data-i18n="btn.login">Login</button>
+      <div class="link-row">
+        <button class="link-btn" id="forgotLink" type="button" data-i18n="link.forgot">Forgot password?</button>
+      </div>
+    </form>
+
+    <!-- FORGOT PASSWORD -->
+    <form id="forgotForm" class="hidden" autocomplete="on">
+      <h2 data-i18n="forgot.title">Reset your password</h2>
+      <p class="hint" style="margin-bottom:14px" data-i18n="forgot.help"></p>
+      <div class="field">
+        <label for="forgotUser" data-i18n="f.userOrEmail">Username or Email</label>
+        <input type="text" id="forgotUser" autocomplete="username" required>
+      </div>
+      <button class="btn block" type="submit" data-i18n="btn.sendReset">Send reset link</button>
+      <div class="link-row">
+        <button class="link-btn" id="backLink" type="button" data-i18n="link.back">Back to login</button>
+      </div>
     </form>
 
     <!-- REGISTER -->
     <form id="registerForm" class="hidden" autocomplete="on">
       <div class="field">
-        <label for="regCompany">Company Name *</label>
+        <label for="regCompany" data-i18n="reg.company">Company Name *</label>
         <input type="text" id="regCompany" maxlength="80" required>
       </div>
       <div class="field">
-        <label for="regAddress">Company Address *</label>
+        <label for="regAddress" data-i18n="reg.address">Company Address *</label>
         <textarea id="regAddress" rows="2" maxlength="160" required></textarea>
       </div>
       <div class="row-2">
         <div class="field">
-          <label for="regPhone">Phone *</label>
+          <label for="regPhone" data-i18n="reg.phone">Phone *</label>
           <input type="tel" id="regPhone" maxlength="25" autocomplete="tel" required>
         </div>
         <div class="field">
-          <label for="regEmail">Email</label>
-          <input type="email" id="regEmail" maxlength="80" autocomplete="email">
+          <label for="regEmail" data-i18n="reg.email">Email *</label>
+          <input type="email" id="regEmail" maxlength="80" autocomplete="email" required>
+          <div class="hint" data-i18n="reg.emailHint">Used to reset your password.</div>
         </div>
       </div>
       <div class="field">
-        <label for="regUser">Username *</label>
+        <label for="regUser" data-i18n="reg.username">Username *</label>
         <input type="text" id="regUser" maxlength="30" autocomplete="username" required>
-        <div class="hint">3–30 characters: letters, numbers, dot, underscore.</div>
+        <div class="hint" data-i18n="reg.usernameHint">3–30 characters: letters, numbers, dot, underscore.</div>
       </div>
       <div class="row-2">
         <div class="field">
-          <label for="regPass">Password *</label>
+          <label for="regPass" data-i18n="reg.password">Password *</label>
           <input type="password" id="regPass" autocomplete="new-password" required>
-          <div class="hint">At least 6 characters.</div>
+          <div class="hint" data-i18n="reg.passwordHint">At least 6 characters.</div>
         </div>
         <div class="field">
-          <label for="regPass2">Confirm Password *</label>
+          <label for="regPass2" data-i18n="reg.confirm">Confirm Password *</label>
           <input type="password" id="regPass2" autocomplete="new-password" required>
         </div>
       </div>
-      <button class="btn block" type="submit">Create Account</button>
+      <button class="btn block" type="submit" data-i18n="btn.create">Create Account</button>
     </form>
   </div>
 </div>
 
 <script src="firebase-config.js"></script>
 <script src="firebase-bundle.js"></script>
+<script src="i18n.js"></script>
 <script src="auth.js"></script>
 <script>
   // Already signed in? Go straight to the calculator.
@@ -83,33 +108,63 @@
 
   const $ = (id) => document.getElementById(id);
   const msg = $("msg");
+  let lastMsg = null; // { key | text, type } so the message can be re-translated
 
-  function show(text, type) {
-    msg.textContent = text;
-    msg.className = "msg show " + type;
+  function show(textOrKey, type, isKey) {
+    lastMsg = { v: textOrKey, type, isKey: !!isKey };
+    renderMsg();
   }
-  function clearMsg() { msg.className = "msg"; msg.textContent = ""; }
+  function renderMsg() {
+    if (!lastMsg) return;
+    msg.textContent = lastMsg.isKey ? t(lastMsg.v) : lastMsg.v;
+    msg.className = "msg show " + lastMsg.type;
+  }
+  function clearMsg() { lastMsg = null; msg.className = "msg"; msg.textContent = ""; }
+  I18N.onChange(renderMsg);
 
-  function switchTab(which) {
-    const isLogin = which === "login";
-    $("loginForm").classList.toggle("hidden", !isLogin);
-    $("registerForm").classList.toggle("hidden", isLogin);
-    $("tabLogin").classList.toggle("active", isLogin);
-    $("tabRegister").classList.toggle("active", !isLogin);
+  function showForm(which) {
+    $("loginForm").classList.toggle("hidden", which !== "login");
+    $("forgotForm").classList.toggle("hidden", which !== "forgot");
+    $("registerForm").classList.toggle("hidden", which !== "register");
+    $("tabLogin").classList.toggle("active", which !== "register");
+    $("tabRegister").classList.toggle("active", which === "register");
     clearMsg();
   }
-  $("tabLogin").addEventListener("click", () => switchTab("login"));
-  $("tabRegister").addEventListener("click", () => switchTab("register"));
+  $("tabLogin").addEventListener("click", () => showForm("login"));
+  $("tabRegister").addEventListener("click", () => showForm("register"));
+  $("forgotLink").addEventListener("click", () => {
+    const typed = $("loginUser").value;
+    showForm("forgot");
+    $("forgotUser").value = typed;
+    $("forgotUser").focus();
+  });
+  $("backLink").addEventListener("click", () => showForm("login"));
+
+  function busy(btn, on, key) {
+    if (on) { btn.disabled = true; btn.textContent = t("btn.wait"); }
+    else { btn.disabled = false; btn.textContent = t(key); }
+  }
 
   $("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     clearMsg();
     const btn = e.target.querySelector("button[type=submit]");
-    btn.disabled = true; btn.textContent = "Please wait...";
+    busy(btn, true);
     const res = await Auth.login($("loginUser").value, $("loginPass").value);
     if (res.ok) { window.location.href = "app.html"; return; }
-    btn.disabled = false; btn.textContent = "Login";
+    busy(btn, false, "btn.login");
     show(res.error, "err");
+  });
+
+  $("forgotForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearMsg();
+    const btn = e.target.querySelector("button[type=submit]");
+    busy(btn, true);
+    const res = await Auth.sendReset($("forgotUser").value);
+    busy(btn, false, "btn.sendReset");
+    if (res.ok) show("forgot.sent", "ok", true);
+    else show(res.error, "err");
   });
 
   $("registerForm").addEventListener("submit", async (e) => {
@@ -118,14 +173,13 @@
     const username = $("regUser").value.trim();
     const pass = $("regPass").value;
 
-    if (!/^[A-Za-z0-9_.]{3,30}$/.test(username)) {
-      return show("Username must be 3–30 characters: letters, numbers, dot or underscore.", "err");
-    }
-    if (pass.length < 6) return show("Password must be at least 6 characters.", "err");
-    if (pass !== $("regPass2").value) return show("The two passwords do not match.", "err");
+    if (!/^[A-Za-z0-9_.]{3,30}$/.test(username)) return show("reg.errUser", "err", true);
+    if (pass.length < 6) return show("reg.errPass", "err", true);
+    if (pass !== $("regPass2").value) return show("reg.errMatch", "err", true);
 
-    const rbtn = e.target.querySelector("button[type=submit]");
-    rbtn.disabled = true; rbtn.textContent = "Creating account...";
+    const btn = e.target.querySelector("button[type=submit]");
+    btn.disabled = true; btn.textContent = t("btn.creating");
+
     const res = await Auth.register({
       company: $("regCompany").value,
       address: $("regAddress").value,
@@ -135,14 +189,14 @@
       password: pass,
     });
 
-    rbtn.disabled = false; rbtn.textContent = "Create Account";
+    btn.disabled = false; btn.textContent = t("btn.create");
     if (!res.ok) return show(res.error, "err");
 
     $("registerForm").reset();
-    switchTab("login");
+    showForm("login");
     $("loginUser").value = res.username;
     $("loginPass").focus();
-    show("Account created. Please login with your username and password.", "ok");
+    show("reg.ok", "ok", true);
   });
 </script>
 </body>

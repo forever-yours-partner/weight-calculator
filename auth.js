@@ -1,56 +1,59 @@
 /*
- * Login for the website, backed by Firebase (works on every device).
+ * Login + cloud storage for the website, backed by Firebase (works on every device).
  *
- * Firebase signs in with an email, so the username is turned into a hidden
- * email like  hanoos@weightcalc.app  behind the scenes. People still just type
- * their username and password.
+ * Accounts sign in with a real email (needed for "forgot password"). People can login
+ * with their username OR their email:
+ *   usernames/{username}        -> { uid, email }      (lets a username find its email)
+ *   users/{uid}                 -> company profile + billCounter
+ *   users/{uid}/work/current    -> the bill being worked on
+ *   users/{uid}/bills/{billId}  -> saved bills (history)
  *
- * Firestore layout (only the signed-in owner can read/write, see firestore.rules):
- *   users/{uid}               -> company profile
- *   users/{uid}/work/current  -> current bill (items, customer, net weight ...)
+ * Accounts made by the first version (no real email) used  username@weightcalc.app
+ * behind the scenes; login() still falls back to that so those accounts keep working.
  */
 const Auth = (() => {
-  const EMAIL_DOMAIN = "@weightcalc.app";
+  const LEGACY_DOMAIN = "@weightcalc.app";
   let auth = null;
   let db = null;
   let readyPromise = null;
 
   function init() {
     if (auth) return;
-    if (!window.FB || !window.FIREBASE_CONFIG) {
-      throw new Error("Firebase files did not load. Please refresh the page.");
-    }
+    if (!window.FB || !window.FIREBASE_CONFIG) throw new Error(t("err.loadFailed"));
     const app = FB.initializeApp(window.FIREBASE_CONFIG);
     auth = FB.getAuth(app);
     db = FB.getFirestore(app);
   }
 
-  const toEmail = (username) => (username || "").trim().toLowerCase() + EMAIL_DOMAIN;
-
   function friendly(err) {
     const code = (err && err.code) || "";
     switch (code) {
-      case "auth/email-already-in-use":
-        return "This username is already taken. Please choose another one.";
+      case "auth/email-already-in-use": return t("err.emailInUse");
       case "auth/invalid-credential":
       case "auth/wrong-password":
-      case "auth/user-not-found":
-      case "auth/invalid-email":
-        return "Wrong username or password.";
-      case "auth/too-many-requests":
-        return "Too many attempts. Please wait a few minutes and try again.";
-      case "auth/network-request-failed":
-        return "No internet connection. Please check your network and try again.";
-      case "auth/weak-password":
-        return "Password must be at least 6 characters.";
-      case "auth/operation-not-allowed":
-        return "Email/Password sign-in is not enabled in Firebase.";
+      case "auth/user-not-found": return t("err.wrong");
+      case "auth/invalid-email": return t("err.invalidEmail");
+      case "auth/too-many-requests": return t("err.tooMany");
+      case "auth/network-request-failed": return t("err.network");
+      case "auth/weak-password": return t("err.weak");
+      case "auth/operation-not-allowed": return t("err.notEnabled");
       case "permission-denied":
-      case "firestore/permission-denied":
-        return "Database permission denied. Please publish the Firestore rules (see README).";
-      default:
-        return (err && err.message) ? err.message : "Something went wrong. Please try again.";
+      case "firestore/permission-denied": return t("err.permission");
+      case "unavailable":
+      case "firestore/unavailable": return t("err.network");
+      default: return t("err.generic");
     }
+  }
+
+  // Username or email -> the email used by Firebase.
+  async function resolveEmail(identifier) {
+    const id = (identifier || "").trim().toLowerCase();
+    if (id.indexOf("@") !== -1) return id;
+    try {
+      const snap = await FB.getDoc(FB.doc(db, "usernames", id));
+      if (snap.exists() && snap.data().email) return snap.data().email;
+    } catch (e) { /* fall through to the legacy address */ }
+    return id + LEGACY_DOMAIN;
   }
 
   // Resolves once with the signed-in Firebase user (or null).
@@ -73,19 +76,27 @@ const Auth = (() => {
     try {
       init();
       const username = (details.username || "").trim().toLowerCase();
-      const cred = await FB.createUserWithEmailAndPassword(auth, toEmail(username), details.password);
+      const email = (details.email || "").trim().toLowerCase();
+
+      const taken = await FB.getDoc(FB.doc(db, "usernames", username));
+      if (taken.exists()) return { ok: false, error: t("err.taken") };
+
+      const cred = await FB.createUserWithEmailAndPassword(auth, email, details.password);
       const profile = {
         username,
         company: details.company.trim(),
         address: details.address.trim(),
         phone: details.phone.trim(),
-        email: (details.email || "").trim(),
+        email,
+        billCounter: 0,
         createdAt: new Date().toISOString(),
       };
       try {
+        await FB.setDoc(FB.doc(db, "usernames", username), { uid: cred.user.uid, email });
         await FB.setDoc(FB.doc(db, "users", cred.user.uid), profile);
       } catch (e) {
         // Do not leave a half-created account behind.
+        try { await FB.deleteDoc(FB.doc(db, "usernames", username)); } catch (_) { /* ignore */ }
         try { await FB.deleteUser(cred.user); } catch (_) { /* ignore */ }
         throw e;
       }
@@ -96,15 +107,54 @@ const Auth = (() => {
     }
   }
 
-  async function login(usernameRaw, password) {
+  async function login(identifier, password) {
     try {
       init();
-      const cred = await FB.signInWithEmailAndPassword(auth, toEmail(usernameRaw), password);
+      const email = await resolveEmail(identifier);
+      const cred = await FB.signInWithEmailAndPassword(auth, email, password);
       const profile = await getProfile(cred.user.uid);
       if (!profile) {
         await FB.signOut(auth);
-        return { ok: false, error: "Company profile not found for this account." };
+        return { ok: false, error: t("err.noProfile") };
       }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: friendly(e) };
+    }
+  }
+
+  // Always reports success for unknown accounts (so nobody can probe which accounts exist).
+  async function sendReset(identifier) {
+    try {
+      init();
+      const email = await resolveEmail(identifier);
+      try {
+        await FB.sendPasswordResetEmail(auth, email);
+      } catch (e) {
+        if (!e || (e.code !== "auth/user-not-found" && e.code !== "auth/invalid-email")) throw e;
+      }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: friendly(e) };
+    }
+  }
+
+  async function changePassword(current, next) {
+    try {
+      init();
+      const user = auth.currentUser;
+      if (!user) return { ok: false, error: t("err.generic") };
+      const cred = FB.EmailAuthProvider.credential(user.email, current);
+      try {
+        await FB.reauthenticateWithCredential(user, cred);
+      } catch (e) {
+        const c = (e && e.code) || "";
+        if (c === "auth/invalid-credential" || c === "auth/wrong-password") {
+          return { ok: false, error: t("err.wrongCurrent") };
+        }
+        throw e;
+      }
+      await FB.updatePassword(user, next);
       return { ok: true };
     } catch (e) {
       return { ok: false, error: friendly(e) };
@@ -145,6 +195,7 @@ const Auth = (() => {
     try { localStorage.setItem("wc_profile_" + uid, JSON.stringify(profile)); } catch (_) { /* ignore */ }
   }
 
+  // ----- the bill currently being worked on -----
   async function loadWork(uid) {
     const snap = await FB.getDoc(FB.doc(db, "users", uid, "work", "current"));
     return snap.exists() ? snap.data() : null;
@@ -156,5 +207,36 @@ const Auth = (() => {
     await FB.setDoc(FB.doc(db, "users", uid, "work", "current"), clean);
   }
 
-  return { whenReady, register, login, logout, requireLogin, cacheProfile, loadWork, saveWork };
+  // ----- saved bills (history) -----
+  async function nextBillNo(uid) {
+    const ref = FB.doc(db, "users", uid);
+    const snap = await FB.getDoc(ref);
+    const n = ((snap.exists() && snap.data().billCounter) || 0) + 1;
+    await FB.updateDoc(ref, { billCounter: n });
+    return n;
+  }
+
+  async function saveBill(uid, id, bill) {
+    const clean = JSON.parse(JSON.stringify(bill));
+    await FB.setDoc(FB.doc(db, "users", uid, "bills", id), clean);
+  }
+
+  async function listBills(uid) {
+    const q = FB.query(
+      FB.collection(db, "users", uid, "bills"),
+      FB.orderBy("createdAt", "desc"),
+      FB.limit(300)
+    );
+    const snap = await FB.getDocs(q);
+    return snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
+  }
+
+  async function deleteBill(uid, id) {
+    await FB.deleteDoc(FB.doc(db, "users", uid, "bills", id));
+  }
+
+  return {
+    whenReady, register, login, sendReset, changePassword, logout, requireLogin, cacheProfile,
+    loadWork, saveWork, nextBillNo, saveBill, listBills, deleteBill,
+  };
 })();
